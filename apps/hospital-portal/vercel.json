@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter @szhms/database run db:push && pnpm --filter @szhms/database run db:seed && pnpm run build"
+  "buildCommand": "echo '── db push ──' && pnpm --filter @szhms/database run db:push && echo '── seed ──' && (pnpm --filter @szhms/database run db:seed || echo 'SEED SKIPPED (non-fatal)') && echo '── next build ──' && pnpm run build"
 }

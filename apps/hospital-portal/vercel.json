@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "pnpm --filter @szhms/database run db:generate && pnpm run build",
-  "ignoreCommand": "npx turbo-ignore hospital-portal"
+  "buildCommand": "pnpm --filter @szhms/database run db:push && pnpm --filter @szhms/database run db:seed && pnpm run build"
 }

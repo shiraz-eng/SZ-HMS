@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "echo '── db push ──' && pnpm --filter @szhms/database run db:push && echo '── seed ──' && (pnpm --filter @szhms/database run db:seed || echo 'SEED SKIPPED (non-fatal)') && echo '── next build ──' && pnpm run build && echo '── copy prisma engine into .next/server ──' && find ../../node_modules -name 'libquery_engine-rhel-openssl-3.0.x.so.node' -exec cp -v {} .next/server/ ';' && cp -v ../../packages/database/prisma/schema.prisma .next/server/ && ls -la .next/server/libquery_engine-*"
+  "buildCommand": "node scripts/vercel-build.mjs"
 }

@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens. Every colour in the product resolves from these CSS variables,
+ * so a single component tree serves every white-labeled tenant. Values are
+ * space-separated RGB channels so Tailwind can apply opacity:
+ *   bg-primary/10, text-primary, border-border, ...
+ */
+:root {
+  --color-primary: 37 99 235; /* Cobalt Blue 600 - tenant overridable */
+  --color-primary-fg: 255 255 255;
+  --color-accent: 13 148 136; /* Teal 600 */
+
+  --color-canvas: 249 250 251; /* Off-white app background */
+  --color-surface: 255 255 255; /* Cards, panels */
+  --color-border: 226 232 240;
+  --color-fg: 15 23 42;
+
+  --color-muted: 241 245 249;
+  --color-muted-fg: 100 116 139;
+
+  --color-danger: 220 38 38;
+  --color-warning: 217 119 6;
+  --color-success: 22 163 74;
+
+  --radius: 0.625rem;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/*
+ * Doctor Portal variant: cooler, higher-contrast borders and a calmer surface
+ * for long clinical sessions / reduced eye strain. Opt in with
+ * <div data-portal="doctor"> on the portal layout.
+ */
+[data-portal="doctor"] {
+  --color-canvas: 248 250 252;
+  --color-border: 203 213 225;
+  --color-fg: 12 20 38;
+  --color-muted-fg: 71 85 105;
+}
+
+* {
+  border-color: rgb(var(--color-border));
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: rgb(var(--color-canvas));
+  color: rgb(var(--color-fg));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* One consistent focus ring across every portal. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 2px;
+  border-radius: 2px;
+}

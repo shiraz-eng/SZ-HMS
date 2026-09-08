@@ -1,0 +1,2 @@
+/* Pulls in Tailwind layers + SZ HMS design tokens from the shared package. */
+@import "@szhms/ui/styles/globals.css";

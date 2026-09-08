@@ -1,6 +1,9 @@
+import { cache } from "react";
+import { prisma } from "@szhms/database";
 import type { TenantTheme } from "@szhms/ui";
 
 export interface TenantRecord {
+  id: string;
   slug: string;
   name: string;
   logoText: string;
@@ -8,35 +11,63 @@ export interface TenantRecord {
 }
 
 /**
- * Stand-in for `packages/database`. Replace with a tenant-scoped Prisma query
- * (cached per request) in Phase 2. Every value here is what the Hospital Admin
- * "theme customizer" would write.
+ * Resolves a hospital by its subdomain slug. `cache()` dedupes the query across
+ * the layout + page render of a single request.
  */
-const TENANTS: Record<string, TenantRecord> = {
-  demo: {
-    slug: "demo",
-    name: "SZ HMS Demo Hospital",
-    logoText: "SZ",
-    theme: { primaryHex: "#2563EB", accentHex: "#0D9488" },
-  },
-  mercy: {
-    slug: "mercy",
-    name: "Mercy Clinic",
-    logoText: "MC",
-    theme: { primaryHex: "#1D4ED8", accentHex: "#0EA5E9" },
-  },
-  "st-lukes": {
-    slug: "st-lukes",
-    name: "St. Luke's Hospital",
-    logoText: "SL",
-    theme: { primaryHex: "#7C3AED", accentHex: "#DB2777", radius: "0.375rem" },
-  },
-};
+export const getTenantBySlug = cache(async (slug: string): Promise<TenantRecord | null> => {
+  const t = await prisma.tenant.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      logoText: true,
+      primaryHex: true,
+      accentHex: true,
+      primaryForegroundHex: true,
+      radius: true,
+    },
+  });
+  if (!t) return null;
 
-export async function getTenantBySlug(slug: string): Promise<TenantRecord | null> {
-  return TENANTS[slug] ?? null;
-}
+  return {
+    id: t.id,
+    slug: t.slug,
+    name: t.name,
+    logoText: t.logoText,
+    theme: {
+      primaryHex: t.primaryHex,
+      accentHex: t.accentHex,
+      primaryForegroundHex: t.primaryForegroundHex,
+      radius: t.radius,
+    },
+  };
+});
 
-export function listTenants(): TenantRecord[] {
-  return Object.values(TENANTS);
+export async function listTenants(): Promise<TenantRecord[]> {
+  const rows = await prisma.tenant.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      logoText: true,
+      primaryHex: true,
+      accentHex: true,
+      primaryForegroundHex: true,
+      radius: true,
+    },
+  });
+  return rows.map((t) => ({
+    id: t.id,
+    slug: t.slug,
+    name: t.name,
+    logoText: t.logoText,
+    theme: {
+      primaryHex: t.primaryHex,
+      accentHex: t.accentHex,
+      primaryForegroundHex: t.primaryForegroundHex,
+      radius: t.radius,
+    },
+  }));
 }

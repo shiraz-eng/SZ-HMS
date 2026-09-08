@@ -5,8 +5,8 @@ import { listTenants } from "@/lib/tenant";
  * Apex host (no tenant subdomain). In production this would redirect to the
  * marketing site; in dev it's a handy directory of seeded demo tenants.
  */
-export default function ApexPage() {
-  const tenants = listTenants();
+export default async function ApexPage() {
+  const tenants = await listTenants();
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center gap-8 px-6 py-16">

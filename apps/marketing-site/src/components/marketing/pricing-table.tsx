@@ -1,55 +1,6 @@
 import Link from "next/link";
 import { cn } from "@szhms/ui";
-
-export interface Plan {
-  id: string;
-  name: string;
-  price: string;
-  cadence: string;
-  blurb: string;
-  features: string[];
-  featured?: boolean;
-}
-
-export const PLANS: Plan[] = [
-  {
-    id: "basic",
-    name: "Basic",
-    price: "$149",
-    cadence: "/ month",
-    blurb: "Single-site clinics getting off paper.",
-    features: ["1 location", "Up to 10 staff", "EHR + scheduling", "Card payments", "Email support"],
-  },
-  {
-    id: "polyclinic",
-    name: "Polyclinic",
-    price: "$499",
-    cadence: "/ month",
-    blurb: "Multi-department clinics and day hospitals.",
-    features: [
-      "Up to 5 locations",
-      "Unlimited staff",
-      "Billing + inventory",
-      "Custom theming",
-      "Priority support",
-    ],
-    featured: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "Custom",
-    cadence: "",
-    blurb: "Hospital groups with compliance needs.",
-    features: [
-      "Unlimited locations",
-      "SSO / SAML",
-      "Audit + data residency",
-      "Dedicated CSM",
-      "99.9% SLA",
-    ],
-  },
-];
+import { PLANS } from "@szhms/payments/plans";
 
 export function PricingTable() {
   return (
@@ -69,7 +20,7 @@ export function PricingTable() {
           )}
           <h3 className="text-sm font-semibold">{p.name}</h3>
           <p className="mt-2">
-            <span className="text-3xl font-semibold">{p.price}</span>
+            <span className="text-3xl font-semibold">{p.priceLabel}</span>
             <span className="text-sm text-muted-fg">{p.cadence}</span>
           </p>
           <p className="mt-1 text-sm text-muted-fg">{p.blurb}</p>
@@ -84,7 +35,7 @@ export function PricingTable() {
           </ul>
 
           <Link
-            href={p.id === "enterprise" ? "/#demo" : `/checkout?plan=${p.id}`}
+            href={p.contactSales ? "/#demo" : `/checkout?plan=${p.id}`}
             className={cn(
               "mt-6 rounded-md px-3 py-2 text-center text-sm font-semibold",
               p.featured
@@ -92,7 +43,7 @@ export function PricingTable() {
                 : "border border-border hover:bg-muted",
             )}
           >
-            {p.id === "enterprise" ? "Talk to sales" : "Start with " + p.name}
+            {p.contactSales ? "Talk to sales" : `Start with ${p.name}`}
           </Link>
         </div>
       ))}

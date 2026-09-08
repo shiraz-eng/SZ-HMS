@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import { getTenantBySlug } from "@/lib/tenant";
+import { getEhrBootstrap } from "@/lib/ehr";
 import { EhrWorkspace } from "@/components/doctor/ehr/ehr-workspace";
-import { getEhrBootstrap } from "@/components/doctor/ehr/mock";
 
 export default async function PatientEhrPage({
   params,
@@ -8,7 +9,10 @@ export default async function PatientEhrPage({
   params: Promise<{ tenantId: string; patientId: string }>;
 }) {
   const { tenantId, patientId } = await params;
-  const data = await getEhrBootstrap(tenantId, patientId);
+  const tenant = await getTenantBySlug(tenantId);
+  if (!tenant) notFound();
+
+  const data = await getEhrBootstrap(tenant.id, patientId);
   if (!data) notFound();
 
   return (

@@ -1,3 +1,5 @@
+import { forTenant } from "@szhms/database";
+
 export interface QueueEntry {
   patientId: string;
   name: string;
@@ -7,14 +9,48 @@ export interface QueueEntry {
   isNew?: boolean;
 }
 
-/** Swap for a tenant-scoped query of today's appointments in Phase 4. */
-export async function getTodaysQueue(_tenantId: string): Promise<QueueEntry[]> {
-  return [
-    { patientId: "pt_1039", name: "Marta Silva", time: "08:45", reason: "Med refill", status: "done" },
-    { patientId: "pt_1042", name: "Amara Okafor", time: "09:15", reason: "HTN review", status: "in-room" },
-    { patientId: "pt_1043", name: "Ben Carter", time: "09:30", reason: "Knee pain", status: "waiting" },
-    { patientId: "pt_1044", name: "Priya Nair", time: "09:45", reason: "New consult", status: "waiting", isNew: true },
-    { patientId: "pt_1045", name: "Luca Rossi", time: "10:00", reason: "Lab follow-up", status: "waiting" },
-    { patientId: "pt_1046", name: "Grace Kim", time: "10:15", reason: "Rash", status: "waiting" },
-  ];
+const STATUS_MAP: Record<string, QueueEntry["status"]> = {
+  WAITING: "waiting",
+  SCHEDULED: "waiting",
+  IN_ROOM: "in-room",
+  COMPLETED: "done",
+  CANCELLED: "done",
+  NO_SHOW: "done",
+};
+
+/** Today's appointments for the signed-in doctor's tenant, ordered by time. */
+export async function getTodaysQueue(tenantId: string, doctorUserId?: string): Promise<QueueEntry[]> {
+  const db = forTenant(tenantId);
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+  const doctor = doctorUserId
+    ? await db.doctor.findUnique({ where: { userId: doctorUserId }, select: { id: true } })
+    : null;
+
+  const appts = await db.appointment.findMany({
+    where: {
+      startsAt: { gte: startOfDay, lt: endOfDay },
+      ...(doctor ? { doctorId: doctor.id } : {}),
+    },
+    orderBy: { startsAt: "asc" },
+    select: {
+      startsAt: true,
+      reason: true,
+      status: true,
+      type: true,
+      patient: { select: { id: true, fullName: true } },
+    },
+  });
+
+  return appts.map((a) => ({
+    patientId: a.patient.id,
+    name: a.patient.fullName,
+    time: a.startsAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    reason: a.reason,
+    status: STATUS_MAP[a.status] ?? "waiting",
+    isNew: a.type.toLowerCase().includes("new"),
+  }));
 }

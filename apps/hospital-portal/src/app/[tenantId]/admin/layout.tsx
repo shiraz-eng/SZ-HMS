@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { SignOutButton } from "@/components/shell/sign-out-button";
+import { requireRole } from "@/lib/auth";
 
 const NAV = [
   { label: "Overview", href: "" },
@@ -17,6 +19,7 @@ export default async function AdminLayout({
   params: Promise<{ tenantId: string }>;
 }) {
   const { tenantId } = await params;
+  await requireRole(tenantId, "ADMIN");
 
   return (
     <div className="grid h-dvh grid-cols-[220px_minmax(0,1fr)] bg-canvas">
@@ -33,6 +36,9 @@ export default async function AdminLayout({
             </Link>
           ))}
         </nav>
+        <div className="mt-auto pt-3">
+          <SignOutButton tenantId={tenantId} />
+        </div>
       </aside>
       <main className="min-h-0 overflow-auto p-6">{children}</main>
     </div>

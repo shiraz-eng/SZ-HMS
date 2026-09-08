@@ -1,5 +1,6 @@
-import Link from "next/link";
-import { PLANS } from "@/components/marketing/pricing-table";
+import { notFound } from "next/navigation";
+import { getPlan } from "@szhms/payments/plans";
+import { CheckoutForm } from "@/components/marketing/checkout-form";
 
 export default async function CheckoutPage({
   searchParams,
@@ -7,38 +8,24 @@ export default async function CheckoutPage({
   searchParams: Promise<{ plan?: string }>;
 }) {
   const { plan: planId } = await searchParams;
-  const plan = PLANS.find((p) => p.id === planId) ?? PLANS[1];
+  const plan = getPlan(planId ?? "polyclinic");
+  if (!plan || plan.contactSales) notFound();
 
   return (
-    <main className="mx-auto max-w-md px-6 py-20">
-      <h1 className="text-2xl font-semibold">Checkout</h1>
+    <main className="mx-auto max-w-lg px-6 py-16">
+      <h1 className="text-2xl font-semibold">Create your hospital workspace</h1>
       <p className="mt-1 text-sm text-muted-fg">
-        Stripe Checkout redirect is wired in Phase 3 (`packages/payments`).
+        {plan.name} plan · {plan.priceLabel}
+        {plan.cadence}. You&rsquo;ll be sent to Stripe to confirm payment.
       </p>
 
-      <div className="mt-8 rounded-xl border border-border bg-surface p-5 shadow-card">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold">{plan.name} plan</span>
-          <span className="text-sm">
-            {plan.price}
-            <span className="text-muted-fg">{plan.cadence}</span>
-          </span>
-        </div>
-        <ul className="mt-4 space-y-1.5 text-sm text-muted-fg">
-          {plan.features.map((f) => (
-            <li key={f}>• {f}</li>
-          ))}
-        </ul>
-        <button
-          disabled
-          className="mt-6 w-full rounded-md bg-primary py-2 text-sm font-semibold text-primary-fg opacity-60"
-        >
-          Continue to payment
-        </button>
-        <Link href="/pricing" className="mt-3 block text-center text-xs text-primary underline">
-          Back to plans
-        </Link>
+      <div className="mt-8 rounded-xl border border-border bg-surface p-6 shadow-card">
+        <CheckoutForm planId={plan.id} />
       </div>
+
+      <p className="mt-4 text-xs text-muted-fg">
+        Test card <code>4242 4242 4242 4242</code>, any future expiry / CVC.
+      </p>
     </main>
   );
 }

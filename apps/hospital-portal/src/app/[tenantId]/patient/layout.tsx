@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { requireRole } from "@/lib/auth";
 
 /**
  * Patient Portal shell — mobile-first. Content is a single centered column;
@@ -20,6 +21,7 @@ export default async function PatientLayout({
   params: Promise<{ tenantId: string }>;
 }) {
   const { tenantId } = await params;
+  await requireRole(tenantId, "PATIENT");
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-canvas">

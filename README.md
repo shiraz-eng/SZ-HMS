@@ -21,6 +21,37 @@ corepack enable
 
 ```bash
 pnpm install
+```
+
+### 1. Database (Phase 1)
+
+Start Postgres and point the env at it:
+
+```bash
+docker run --name szhms-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16
+```
+
+Copy env files, then create the schema and seed demo data:
+
+```bash
+cp packages/database/.env.example packages/database/.env
+cp apps/hospital-portal/.env.example apps/hospital-portal/.env.local
+cp apps/marketing-site/.env.example apps/marketing-site/.env.local
+
+pnpm --filter @szhms/database db:generate
+pnpm --filter @szhms/database db:migrate --name init
+pnpm --filter @szhms/database db:seed
+```
+
+Set a real `AUTH_SECRET` in `apps/hospital-portal/.env.local`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 2. Run
+
+```bash
 pnpm dev
 ```
 
@@ -41,8 +72,10 @@ use either form:
 
 Seeded demo tenants: `demo`, `mercy`, `st-lukes`.
 
-**Login** — the demo auth routes by email prefix. Use any 4+ char password with:
-`doctor@demo.io`, `reception@demo.io`, `patient@demo.io`, `admin@demo.io`.
+**Login** — seeded users, password `password`:
+`admin@demo.io`, `doctor@demo.io`, `reception@demo.io`, `patient@demo.io`.
+The session is a signed (jose) HTTP-only cookie; `middleware.ts` enforces the
+role → portal mapping, and each portal layout re-checks with `requireRole()`.
 
 ### Reference screen — Doctor Portal EHR
 
@@ -52,15 +85,41 @@ The 3-column EHR (`src/components/doctor/ehr/`) is the design standard: all colo
 via CSS-variable Tailwind tokens, persistent patient header, independently
 scrolling columns on `xl+`, segmented switch below that, debounced autosave stub.
 
+## Billing & onboarding (Phase 3)
+
+`marketing-site/checkout` collects hospital name, subdomain, and admin
+credentials, provisions the tenant with the subscription `INCOMPLETE`, then
+redirects to Stripe Checkout. `apps/marketing-site/src/app/api/webhooks/stripe`
+verifies the signature and flips the subscription to `ACTIVE`
+(`activateSubscription`). Passwords never transit Stripe.
+
+Local Stripe:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# put the printed whsec_... in apps/marketing-site/.env.local
+```
+
 ## Structure
 
 ```
 apps/
-  marketing-site/     Next.js App Router — public site
+  marketing-site/     Next.js App Router — public site + Stripe checkout/webhook
   hospital-portal/    Next.js App Router — [tenantId] routing + role portals
 packages/
   ui/                 design tokens, Tailwind preset, TenantThemeProvider, cn()
+  database/           Prisma schema + client + forTenant() + provisioning
+  auth/               scrypt password hashing + jose session tokens
+  payments/           PaymentProvider interface + Stripe driver (PayPal stub)
 ```
+
+### Tenant isolation
+
+`forTenant(tenantId)` returns a Prisma client whose extension injects
+`where.tenantId` on every read/update/delete and `data.tenantId` on every
+create, for all operational models. A filter naming a different tenant throws.
+The unscoped `prisma` is used only for tenant resolution, login, provisioning,
+and webhooks.
 
 ### Theming
 
@@ -80,8 +139,16 @@ into a calmer variant with `data-portal="doctor"`.
 ## What's implemented now
 
 - ✅ Monorepo + shared design system + tenant theming
-- ✅ `middleware.ts` subdomain → `[tenantId]` rewrite
-- ✅ White-labeled unified login with role routing (demo auth)
-- ✅ **Doctor Portal**: queue sidebar + full 3-column EHR
-- 🟡 Patient / Reception / Admin: styled route stubs (layouts + representative pages)
-- ⬜ Database, real auth, payments, charts — later phases
+- ✅ **Phase 1** — Prisma schema (Tenants, Subscriptions, Users, Doctors,
+  Receptionists, Patients, Appointments, MedicalRecords, Billings), client
+  singleton, `forTenant()` isolation extension, seed script
+- ✅ **Phase 2** — scrypt + jose auth, real login server action, `middleware.ts`
+  subdomain rewrite **+ role guard**, `requireRole()` per portal, DB-backed
+  tenant resolution + theming, admin theme customizer persists to the DB
+- ✅ **Phase 3** — `@szhms/payments` (Stripe driver, PayPal stub), checkout
+  onboarding flow, webhook-driven tenant activation
+- ✅ **Doctor Portal**: queue sidebar + 3-column EHR, now reading tenant-scoped
+  data from Postgres
+- 🟡 Patient / Reception / Admin: role-guarded shells with representative pages;
+  full features + Chart.js/D3 widgets land in Phase 4–5
+- ⬜ EHR write path (sign encounter), drag-drop calendar, real analytics — later

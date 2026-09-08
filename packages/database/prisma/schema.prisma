@@ -1,0 +1,277 @@
+// SZ HMS - unified schema with strict tenant isolation.
+// Every operational table carries `tenantId`; the tenant-safe client in
+// src/tenant-client.ts enforces it on every query (fail-closed).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & billing
+// ---------------------------------------------------------------------------
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum PlanTier {
+  BASIC
+  POLYCLINIC
+  ENTERPRISE
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique // subdomain, e.g. "mercy"
+  name      String
+  logoText  String   @default("SZ")
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Theme tokens written by the Hospital Admin theme customizer.
+  primaryHex           String  @default("#2563EB")
+  accentHex            String  @default("#0D9488")
+  primaryForegroundHex String  @default("#FFFFFF")
+  radius               String  @default("0.625rem")
+
+  subscription   Subscription?
+  users          User[]
+  patients       Patient[]
+  doctors        Doctor[]
+  receptionists  Receptionist[]
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+  billings       Billing[]
+
+  @@map("tenants")
+}
+
+model Subscription {
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  tier                 PlanTier
+  status               SubscriptionStatus @default(TRIALING)
+  provider             String             @default("stripe") // "stripe" | "paypal"
+  externalCustomerId   String? // Stripe customer / PayPal payer id
+  externalSubscriptionId String?           @unique
+  seats                Int                @default(10)
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  DOCTOR
+  RECEPTIONIST
+  PATIENT
+}
+
+model User {
+  id           String  @id @default(cuid())
+  tenantId     String
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email        String
+  name         String
+  passwordHash String
+  role         Role
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor       Doctor?
+  patient      Patient?
+  receptionist Receptionist?
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Role profiles (1:1 with User)
+// ---------------------------------------------------------------------------
+
+model Doctor {
+  id         String  @id @default(cuid())
+  tenantId   String
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String  @unique
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty  String
+  licenseNo  String
+  roomLabel  String?
+
+  appointments Appointment[]
+
+  @@index([tenantId])
+  @@map("doctors")
+}
+
+model Receptionist {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deskNo   String?
+
+  @@index([tenantId])
+  @@map("receptionists")
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model Patient {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String?  @unique // set when the patient has portal access
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  mrn         String // medical record number, unique per tenant
+  fullName    String
+  dateOfBirth DateTime
+  sex         Sex
+  phone       String?
+  email       String?
+  allergies   String[] @default([])
+  bloodType   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+  billings       Billing[]
+
+  @@unique([tenantId, mrn])
+  @@index([tenantId])
+  @@map("patients")
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+enum AppointmentStatus {
+  SCHEDULED
+  WAITING
+  IN_ROOM
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  tenantId  String
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patientId String
+  patient   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId  String
+  doctor    Doctor            @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String
+  type      String            @default("Follow-up")
+  status    AppointmentStatus @default(SCHEDULED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  medicalRecord MedicalRecord?
+  billing       Billing?
+
+  @@index([tenantId, startsAt])
+  @@index([tenantId, doctorId, startsAt])
+  @@map("appointments")
+}
+
+model MedicalRecord {
+  id            String  @id @default(cuid())
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointmentId String  @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patientId     String
+  patient       Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // SOAP note
+  subjective String @default("")
+  objective  String @default("")
+  assessment String @default("")
+  plan       String @default("")
+
+  // Structured payloads: diagnoses[], prescriptions[], labOrders[], vitals{}
+  diagnoses     Json @default("[]")
+  prescriptions Json @default("[]")
+  labOrders     Json @default("[]")
+  vitals        Json @default("{}")
+
+  signedAt   DateTime?
+  signedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, patientId])
+  @@map("medical_records")
+}
+
+enum BillingStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+  REFUNDED
+}
+
+model Billing {
+  id            String  @id @default(cuid())
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointmentId String? @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  patientId     String
+  patient       Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  invoiceNo    String
+  currency     String        @default("USD")
+  amountCents  Int
+  taxCents     Int           @default(0)
+  status       BillingStatus @default(DRAFT)
+  lineItems    Json          @default("[]") // [{ description, qty, unitCents }]
+  issuedAt     DateTime?
+  paidAt       DateTime?
+  paymentRef   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId, status])
+  @@map("billings")
+}

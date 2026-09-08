@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
+import { notFound } from "next/navigation";
+import { getTenantBySlug } from "@/lib/tenant";
+import { requireRole } from "@/lib/auth";
 import { getTodaysQueue } from "@/lib/queue";
 import { PatientQueueSidebar } from "@/components/doctor/patient-queue-sidebar";
 
 /**
- * Doctor Portal shell: opts into the low-eye-strain token variant and pins the
- * live patient queue to the left. The queue is a Server Component fetch passed
- * to a Client child so filtering/active-state stay on the client.
+ * Doctor Portal shell: role-guarded, opts into the low-eye-strain token
+ * variant, and pins the live patient queue to the left.
  */
 export default async function DoctorLayout({
   children,
@@ -15,7 +17,11 @@ export default async function DoctorLayout({
   params: Promise<{ tenantId: string }>;
 }) {
   const { tenantId } = await params;
-  const queue = await getTodaysQueue(tenantId);
+  const tenant = await getTenantBySlug(tenantId);
+  if (!tenant) notFound();
+
+  const user = await requireRole(tenantId, "DOCTOR");
+  const queue = await getTodaysQueue(tenant.id, user.userId);
 
   return (
     <div

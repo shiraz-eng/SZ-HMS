@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // The shared design system ships as TypeScript source; Next compiles it.
-  transpilePackages: ["@szhms/ui"],
+  // Shared packages ship as TypeScript source; Next compiles them.
+  transpilePackages: ["@szhms/ui", "@szhms/auth", "@szhms/database"],
+  serverExternalPackages: ["@prisma/client"],
 };
 
 export default nextConfig;

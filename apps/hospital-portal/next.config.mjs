@@ -12,12 +12,16 @@ const nextConfig = {
   // Trace workspace files from the monorepo root (needed on Vercel).
   outputFileTracingRoot: rootDir,
   // Force the Prisma client + query engine + schema into every serverless
-  // function bundle (pnpm hoists them where Next's tracer misses them).
+  // function bundle. Globs are relative to THIS app dir; pnpm hoists the
+  // generated client to the repo-root store under .pnpm/@prisma+client@<hash>/.
   outputFileTracingIncludes: {
     "/**/*": [
-      "../../node_modules/.pnpm/@prisma+client*/**/*",
-      "../../node_modules/.pnpm/@prisma+engines*/**/*",
-      "../../node_modules/.prisma/**/*",
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**/*",
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client/**/*",
+      "../../node_modules/.pnpm/prisma@*/node_modules/prisma/**/*",
+      "../../node_modules/.pnpm/@prisma+engines@*/**/*",
+      "../../node_modules/.prisma/client/**/*",
+      "../../node_modules/@prisma/client/**/*",
       "../../packages/database/prisma/schema.prisma",
     ],
   },

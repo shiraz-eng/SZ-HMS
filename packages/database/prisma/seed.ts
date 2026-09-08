@@ -105,6 +105,22 @@ async function seedTenant(opts: {
     },
   });
 
+  // Beds: 3 wards x 8 beds, ~65% occupied.
+  const wards = ["General", "ICU", "Maternity"];
+  for (const ward of wards) {
+    for (let n = 1; n <= 8; n++) {
+      const label = `${ward[0]}${n.toString().padStart(2, "0")}`;
+      const roll = (n + ward.length) % 10;
+      const status =
+        roll < 6 ? "OCCUPIED" : roll < 8 ? "AVAILABLE" : roll < 9 ? "CLEANING" : "OUT_OF_SERVICE";
+      await prisma.bed.upsert({
+        where: { tenantId_ward_label: { tenantId: tenant.id, ward, label } },
+        update: { status },
+        create: { tenantId: tenant.id, ward, label, status },
+      });
+    }
+  }
+
   console.log(`  seeded ${opts.name} (${opts.slug})`);
 }
 

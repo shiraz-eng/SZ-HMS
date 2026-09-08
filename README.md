@@ -162,13 +162,24 @@ converts a hospital's hex colours to RGB channels and overrides the CSS variable
 for its subtree — one component tree, every white-label. The Doctor Portal opts
 into a calmer variant with `data-portal="doctor"`.
 
-## Roadmap
+## Roadmap — all phases complete
 
-1. **Foundation & data layer** — _this scaffold_ + Prisma schema (`Tenants`, `Users`)
-2. **Multi-tenancy, auth & theming** — real `middleware` + Auth.js + tenant-safe DB client
-3. **Marketing & billing** — Stripe/PayPal, webhook-driven tenant provisioning
-4. **Core portals** — Patients/Doctors/Appointments/Records/Billing + server actions
-5. **Admin, analytics & hardening** — Chart.js/D3 widgets, audit logs, tests, deploy
+1. ✅ **Foundation & data layer** — Prisma schema, client, `forTenant()`, seed
+2. ✅ **Multi-tenancy, auth & theming** — `middleware` guard + jose sessions + tenant-safe client
+3. ✅ **Marketing & billing** — Stripe driver, webhook-driven tenant provisioning
+4. ✅ **Core portals** — write paths for Doctor/Reception/Patient/Admin via server actions
+5. ✅ **Admin, analytics & hardening** — Recharts widgets, audit log, rate limiting, tests + CI
+
+## Tests
+
+```bash
+pnpm test        # vitest run — tenant-scope, password, session, slug, cn
+pnpm typecheck   # turbo run typecheck across all packages
+```
+
+CI (`.github/workflows/ci.yml`) runs generate → typecheck → lint → test → build
+on every push/PR to `main`. Commit `pnpm-lock.yaml` after your first
+`pnpm install`, then flip CI back to `--frozen-lockfile`.
 
 ## What's implemented now
 
@@ -190,7 +201,22 @@ into a calmer variant with `data-portal="doctor"`.
   - Patient: `bookAppointment`, `payInvoice` (demo settlement), reports &
     invoices lists
   - Admin overview reads real aggregates (revenue 7d, appts, utilisation)
+- ✅ **Phase 5** — analytics + hardening:
+  - Recharts dashboards: 7/30-day revenue, doctor utilisation, bed-occupancy
+    donut; `admin/analytics/revenue` and `admin/analytics/occupancy` pages
+  - `Bed` model + occupancy by ward; seeded 24 beds/tenant
+  - Staff management (`admin/staff`): add doctor/receptionist/admin with a
+    one-time temp password, activate/deactivate
+  - `AuditLog` model + `recordAudit()` on every privileged mutation;
+    `admin/audit` viewer
+  - Login rate limiting (fixed-window, per tenant+email+IP)
+  - Reception master calendar: HTML5 drag-and-drop reschedule
+  - Patient reports: print-optimised summary page (browser "Save as PDF")
+  - Vitest unit tests (tenant-scope transform, password, session, slug, cn) +
+    GitHub Actions CI (typecheck → lint → test → build)
 - ✅ Vercel-ready: `vercel.json` per app, `outputFileTracingRoot`, Prisma
   `binaryTargets`, `.nvmrc`
-- ⬜ Phase 5 — Chart.js/D3 widgets, drag-and-drop calendar, PDF report renderer,
-  audit log, tests
+
+All five phases are in. Remaining polish (not blocking): real Stripe
+PaymentIntents for patient invoices, Playwright e2e, PDF via a renderer instead
+of browser print, Upstash-backed rate limiting for multi-instance deploys.

@@ -1,6 +1,9 @@
 import { hashPassword } from "@szhms/auth";
 import { prisma } from "./client";
+import { isValidSlug, normalizeSlug } from "./slug";
 import type { PlanTier } from "@prisma/client";
+
+export { normalizeSlug } from "./slug";
 
 export interface ProvisionTenantInput {
   slug: string;
@@ -21,20 +24,8 @@ export interface ProvisionResult {
   created: boolean;
 }
 
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
-const RESERVED = new Set(["www", "app", "api", "admin", "static", "assets", "cdn", "mail"]);
-
-export function normalizeSlug(raw: string): string {
-  return raw
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 32);
-}
-
 export async function isSlugAvailable(slug: string): Promise<boolean> {
-  if (!SLUG_RE.test(slug) || RESERVED.has(slug)) return false;
+  if (!isValidSlug(slug)) return false;
   const existing = await prisma.tenant.findUnique({ where: { slug }, select: { id: true } });
   return !existing;
 }
@@ -46,7 +37,7 @@ export async function isSlugAvailable(slug: string): Promise<boolean> {
  */
 export async function provisionTenant(input: ProvisionTenantInput): Promise<ProvisionResult> {
   const slug = normalizeSlug(input.slug);
-  if (!SLUG_RE.test(slug) || RESERVED.has(slug)) {
+  if (!isValidSlug(slug)) {
     throw new Error(`Invalid tenant slug: "${input.slug}"`);
   }
 

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # Not a real DB — Prisma only needs the URL to be present to generate/validate.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/szhms
+      AUTH_SECRET: ci-secret-at-least-16-characters
+      NEXT_PUBLIC_ROOT_DOMAIN: szhms.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Switch to --frozen-lockfile once pnpm-lock.yaml is committed
+      # (run `pnpm install` locally after Node is set up, then commit the lockfile).
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @szhms/database run db:generate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { forTenant } from "@szhms/database";
+import { forTenant, recordAudit } from "@szhms/database";
 import { requireRole } from "@/lib/auth";
 import { getTenantBySlug } from "@/lib/tenant";
 
@@ -126,6 +126,18 @@ async function persist(
       }
     }
   });
+
+  if (opts.sign) {
+    await recordAudit({
+      tenantId: tenant.id,
+      actorId: user.userId,
+      actorName: user.name,
+      actorRole: user.role,
+      action: "encounter.signed",
+      target: appointment.id,
+      meta: { patientId: appointment.patientId },
+    });
+  }
 
   revalidatePath(`/${tenantSlug}/doctor/patients/${appointment.patientId}`);
   revalidatePath(`/${tenantSlug}/doctor`);

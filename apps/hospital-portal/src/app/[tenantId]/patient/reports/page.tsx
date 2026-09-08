@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { requireRole } from "@/lib/auth";
@@ -28,13 +29,12 @@ export default async function PatientReports({
             <p className="mt-1 line-clamp-2 text-xs text-muted-fg">{r.assessment}</p>
             <div className="mt-2 flex items-center justify-between">
               <span className="text-[11px] text-muted-fg">{r.labs} lab order(s)</span>
-              {/* PDF generation lands with a report renderer; link is a placeholder route. */}
-              <a
-                href={`/${tenantId}/patient/reports/${r.id}.pdf`}
+              <Link
+                href={`/${tenantId}/patient/reports/${r.id}`}
                 className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted"
               >
-                Download PDF
-              </a>
+                View / print PDF
+              </Link>
             </div>
           </li>
         ))}

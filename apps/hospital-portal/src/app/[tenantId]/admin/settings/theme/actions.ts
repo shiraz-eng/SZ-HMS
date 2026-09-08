@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@szhms/database";
+import { prisma, recordAudit } from "@szhms/database";
 import { requireRole } from "@/lib/auth";
 import { getTenantBySlug } from "@/lib/tenant";
 
@@ -30,7 +30,7 @@ export async function saveTheme(_prev: ThemeState, formData: FormData): Promise<
   }
 
   const { tenantSlug, primaryHex, accentHex } = parsed.data;
-  await requireRole(tenantSlug, "ADMIN");
+  const actor = await requireRole(tenantSlug, "ADMIN");
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) return { error: "Unknown hospital." };
@@ -38,6 +38,15 @@ export async function saveTheme(_prev: ThemeState, formData: FormData): Promise<
   await prisma.tenant.update({
     where: { id: tenant.id },
     data: { primaryHex, accentHex },
+  });
+
+  await recordAudit({
+    tenantId: tenant.id,
+    actorId: actor.userId,
+    actorName: actor.name,
+    actorRole: actor.role,
+    action: "tenant.theme_updated",
+    meta: { primaryHex, accentHex },
   });
 
   revalidatePath(`/${tenantSlug}`, "layout");

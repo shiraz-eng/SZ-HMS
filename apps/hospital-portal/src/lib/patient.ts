@@ -125,6 +125,68 @@ export async function getPatientBills(tenantId: string, userId: string) {
   }));
 }
 
+export async function getPatientReport(tenantId: string, userId: string, reportId: string) {
+  const db = forTenant(tenantId);
+  const patient = await db.patient.findFirst({
+    where: { userId },
+    select: { id: true, fullName: true, mrn: true, dateOfBirth: true },
+  });
+  if (!patient) return null;
+
+  const rec = await db.medicalRecord.findFirst({
+    where: { id: reportId, patientId: patient.id, signedAt: { not: null } },
+    select: {
+      id: true,
+      signedAt: true,
+      subjective: true,
+      objective: true,
+      assessment: true,
+      plan: true,
+      diagnoses: true,
+      prescriptions: true,
+      labOrders: true,
+      appointment: {
+        select: { type: true, reason: true, startsAt: true, doctor: { select: { user: { select: { name: true } }, specialty: true } } },
+      },
+    },
+  });
+  if (!rec) return null;
+
+  const asArray = (v: unknown) => (Array.isArray(v) ? v : []);
+
+  return {
+    id: rec.id,
+    signedAt: rec.signedAt ? rec.signedAt.toISOString().slice(0, 10) : "",
+    patient: {
+      name: patient.fullName,
+      mrn: patient.mrn,
+      dob: patient.dateOfBirth.toISOString().slice(0, 10),
+    },
+    visit: {
+      type: rec.appointment?.type ?? "Visit",
+      reason: rec.appointment?.reason ?? "",
+      date: rec.appointment?.startsAt.toISOString().slice(0, 10) ?? "",
+      doctor: rec.appointment?.doctor.user.name ?? "—",
+      specialty: rec.appointment?.doctor.specialty ?? "",
+    },
+    note: {
+      subjective: rec.subjective,
+      objective: rec.objective,
+      assessment: rec.assessment,
+      plan: rec.plan,
+    },
+    diagnoses: asArray(rec.diagnoses) as { code: string; label: string }[],
+    prescriptions: asArray(rec.prescriptions) as {
+      drug: string;
+      strength: string;
+      route: string;
+      frequency: string;
+      durationDays: number;
+    }[],
+    labOrders: asArray(rec.labOrders) as { name: string; code: string; priority: string }[],
+  };
+}
+
 export async function getBookingDoctors(tenantId: string) {
   const db = forTenant(tenantId);
   const rows = await db.doctor.findMany({

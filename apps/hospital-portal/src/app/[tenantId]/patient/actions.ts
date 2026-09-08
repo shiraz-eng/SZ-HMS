@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { forTenant } from "@szhms/database";
+import { forTenant, recordAudit } from "@szhms/database";
 import { requireRole } from "@/lib/auth";
 import { getTenantBySlug } from "@/lib/tenant";
 
@@ -16,7 +16,7 @@ async function ctx(tenantSlug: string) {
     select: { id: true },
   });
   if (!patient) throw new Error("No patient record linked to this account");
-  return { db, patientId: patient.id };
+  return { db, patientId: patient.id, tenantId: tenant.id, actor: user };
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ export async function payInvoice(
   tenantSlug: string,
   invoiceId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { db, patientId } = await ctx(tenantSlug);
+  const { db, patientId, tenantId, actor } = await ctx(tenantSlug);
   const invoice = await db.billing.findFirst({
     where: { id: invoiceId },
     select: { id: true, patientId: true, status: true },
@@ -88,6 +88,15 @@ export async function payInvoice(
   await db.billing.updateMany({
     where: { id: invoice.id },
     data: { status: "PAID", paidAt: new Date(), paymentRef: `demo_${Date.now().toString(36)}` },
+  });
+
+  await recordAudit({
+    tenantId,
+    actorId: actor.userId,
+    actorName: actor.name,
+    actorRole: actor.role,
+    action: "invoice.paid",
+    target: invoice.id,
   });
 
   revalidatePath(`/${tenantSlug}/patient`);

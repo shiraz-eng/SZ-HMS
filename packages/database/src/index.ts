@@ -7,6 +7,7 @@ export {
   SubscriptionStatus,
   AppointmentStatus,
   BillingStatus,
+  BedStatus,
 } from "@prisma/client";
 export type {
   Tenant,
@@ -18,4 +19,7 @@ export type {
   Appointment,
   MedicalRecord,
   Billing,
+  Bed,
+  AuditLog,
 } from "@prisma/client";
+export { recordAudit } from "./audit";

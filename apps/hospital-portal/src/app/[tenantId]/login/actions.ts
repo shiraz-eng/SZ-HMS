@@ -1,9 +1,9 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { prisma } from "@szhms/database";
+import { prisma, recordAudit } from "@szhms/database";
 import {
   createSessionToken,
   ROLE_HOME,
@@ -12,6 +12,7 @@ import {
   verifyPassword,
 } from "@szhms/auth";
 import { getTenantBySlug } from "@/lib/tenant";
+import { rateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   tenantSlug: z.string().min(1),
@@ -33,6 +34,13 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   if (!parsed.success) return { error: "Enter a valid email and password." };
 
   const { tenantSlug, email, password } = parsed.data;
+
+  const ip =
+    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const limited = rateLimit(`login:${tenantSlug}:${email.toLowerCase()}:${ip}`, 5, 60_000);
+  if (!limited.ok) {
+    return { error: `Too many attempts. Try again in ${limited.retryAfterSec}s.` };
+  }
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) return { error: "Unknown hospital." };
@@ -62,6 +70,14 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: SESSION_MAX_AGE,
+  });
+
+  await recordAudit({
+    tenantId: tenant.id,
+    actorId: user.id,
+    actorName: user.name,
+    actorRole: user.role,
+    action: "auth.login",
   });
 
   redirect(`/${tenant.slug}/${ROLE_HOME[user.role]}`);

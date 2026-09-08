@@ -79,4 +79,6 @@ export interface EhrBootstrap {
   medications: Medication[];
   encounters: Encounter[];
   note: SoapNote;
+  prescriptions: PrescriptionItem[];
+  labOrders: LabOrderItem[];
 }

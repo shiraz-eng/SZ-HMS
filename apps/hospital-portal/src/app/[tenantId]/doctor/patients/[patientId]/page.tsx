@@ -17,12 +17,16 @@ export default async function PatientEhrPage({
 
   return (
     <EhrWorkspace
+      tenantSlug={tenantId}
+      encounterId={data.patient.encounter.id}
       patient={data.patient}
       vitals={data.vitals}
       problems={data.problems}
       medications={data.medications}
       encounters={data.encounters}
       initialNote={data.note}
+      initialPrescriptions={data.prescriptions}
+      initialLabOrders={data.labOrders}
     />
   );
 }

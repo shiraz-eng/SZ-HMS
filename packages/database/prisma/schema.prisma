@@ -3,7 +3,9 @@
 // src/tenant-client.ts enforces it on every query (fail-closed).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" for local dev; the rhel target is what Vercel's serverless runtime needs.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

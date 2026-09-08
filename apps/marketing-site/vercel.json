@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "pnpm --filter @szhms/database run db:generate && pnpm run build",
+  "ignoreCommand": "npx turbo-ignore marketing-site"
+}

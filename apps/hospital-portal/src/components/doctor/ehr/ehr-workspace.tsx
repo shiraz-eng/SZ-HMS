@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@szhms/ui";
 import type {
   Encounter,
@@ -12,58 +12,56 @@ import type {
   SoapNote,
   VitalReading,
 } from "@/types/ehr";
+import {
+  saveEncounter,
+  signEncounter,
+  type EncounterActionResult,
+} from "@/app/[tenantId]/doctor/patients/[patientId]/actions";
 import { VitalsHistoryPanel } from "./vitals-history-panel";
 import { DiagnosticNotesPanel } from "./diagnostic-notes-panel";
 import { PrescriptionOrderPanel } from "./prescription-order-panel";
 
 type Column = "history" | "notes" | "orders";
-type SaveState = "idle" | "saving" | "saved";
 
 interface Props {
+  tenantSlug: string;
+  encounterId: string;
   patient: PatientSummary;
   vitals: VitalReading[];
   problems: Problem[];
   medications: Medication[];
   encounters: Encounter[];
   initialNote: SoapNote;
+  initialPrescriptions?: PrescriptionItem[];
+  initialLabOrders?: LabOrderItem[];
 }
 
 /**
- * Doctor Portal — 3-column EHR. Sets the design standard for the product:
- *  - all colour via CSS-variable Tailwind tokens (works white-labeled)
- *  - a persistent patient-context header
- *  - three independently scrolling columns on xl+, a segmented switch below that
- *  - debounced autosave indicator (wire to a server action in Phase 4)
+ * Doctor Portal — 3-column EHR. The design standard for the product:
+ * CSS-variable tokens (white-label safe), a persistent patient-context header,
+ * three independently scrolling columns on xl+ (segmented switch below that),
+ * and server-action save / sign with a live status line.
  */
 export function EhrWorkspace({
+  tenantSlug,
+  encounterId,
   patient,
   vitals,
   problems,
   medications,
   encounters,
   initialNote,
+  initialPrescriptions = [],
+  initialLabOrders = [],
 }: Props) {
   const [note, setNote] = useState<SoapNote>(initialNote);
-  const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([]);
-  const [labs, setLabs] = useState<LabOrderItem[]>([]);
-  const [save, setSave] = useState<SaveState>("idle");
-  const [savedAt, setSavedAt] = useState("");
+  const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>(initialPrescriptions);
+  const [labs, setLabs] = useState<LabOrderItem[]>(initialLabOrders);
+  const [status, setStatus] = useState<string>("Draft");
   const [column, setColumn] = useState<Column>("notes");
-  const isFirstRun = useRef(true);
+  const [pending, startTransition] = useTransition();
 
-  // Debounced autosave stub.
-  useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false;
-      return;
-    }
-    setSave("saving");
-    const t = setTimeout(() => {
-      setSave("saved");
-      setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-    }, 650);
-    return () => clearTimeout(t);
-  }, [note]);
+  const hasEncounter = encounterId !== "none";
 
   const age = useMemo(() => {
     const dob = new Date(patient.dateOfBirth).getTime();
@@ -77,9 +75,30 @@ export function EhrWorkspace({
     .join("");
   const orderCount = prescriptions.length + labs.length;
 
+  function run(sign: boolean) {
+    if (!hasEncounter || pending) return;
+    setStatus(sign ? "Signing…" : "Saving…");
+    startTransition(async () => {
+      const fn = sign ? signEncounter : saveEncounter;
+      const res: EncounterActionResult = await fn(tenantSlug, encounterId, {
+        note,
+        prescriptions,
+        labOrders: labs,
+      });
+      if (res.ok) {
+        const t = new Date(res.savedAt ?? Date.now()).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        setStatus(sign ? `Signed ${t}` : `Saved ${t}`);
+      } else {
+        setStatus(res.error ?? "Save failed");
+      }
+    });
+  }
+
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      {/* Patient context header — always visible */}
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-surface px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
@@ -107,24 +126,27 @@ export function EhrWorkspace({
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-fg" aria-live="polite">
-            {save === "saving" ? "Saving…" : save === "saved" ? `Saved ${savedAt}` : "Draft"}
+            {hasEncounter ? status : "No active encounter"}
           </span>
           <button
             type="button"
-            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+            onClick={() => run(false)}
+            disabled={!hasEncounter || pending}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
           >
             Save draft
           </button>
           <button
             type="button"
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-95"
+            onClick={() => run(true)}
+            disabled={!hasEncounter || pending}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-95 disabled:opacity-50"
           >
             Sign &amp; close{orderCount > 0 ? ` (${orderCount})` : ""}
           </button>
         </div>
       </header>
 
-      {/* Column switch — mobile / tablet only */}
       <div className="flex gap-1 border-b border-border bg-surface p-1 xl:hidden">
         {(["history", "notes", "orders"] as Column[]).map((c) => (
           <button
@@ -142,7 +164,6 @@ export function EhrWorkspace({
         ))}
       </div>
 
-      {/* 3-column clinical grid — independent scroll per column */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)_minmax(320px,380px)]">
         <ColumnPane show={column === "history"} tone="canvas" label="Patient vitals and history">
           <VitalsHistoryPanel

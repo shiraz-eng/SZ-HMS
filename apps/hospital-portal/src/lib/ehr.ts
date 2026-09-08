@@ -1,11 +1,21 @@
 import { forTenant } from "@szhms/database";
-import type { EhrBootstrap, SoapNote, VitalReading } from "@/types/ehr";
+import type {
+  EhrBootstrap,
+  LabOrderItem,
+  PrescriptionItem,
+  SoapNote,
+  VitalReading,
+} from "@/types/ehr";
 
 const SEX_MAP = { MALE: "male", FEMALE: "female", OTHER: "other" } as const;
 
 function vitalsFromJson(v: unknown): VitalReading[] {
   if (Array.isArray(v)) return v as VitalReading[];
   return [];
+}
+
+function arrayFromJson<T>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
 }
 
 function noteFromRecord(rec: {
@@ -36,7 +46,7 @@ export async function getEhrBootstrap(
 ): Promise<EhrBootstrap | null> {
   const db = forTenant(tenantId);
 
-  const patient = await db.patient.findUnique({
+  const patient = await db.patient.findFirst({
     where: { id: patientId },
     select: {
       id: true,
@@ -69,7 +79,7 @@ export async function getEhrBootstrap(
       },
     }),
     appointment
-      ? db.medicalRecord.findUnique({
+      ? db.medicalRecord.findFirst({
           where: { appointmentId: appointment.id },
           select: {
             subjective: true,
@@ -77,6 +87,8 @@ export async function getEhrBootstrap(
             assessment: true,
             plan: true,
             diagnoses: true,
+            prescriptions: true,
+            labOrders: true,
             vitals: true,
           },
         })
@@ -109,5 +121,7 @@ export async function getEhrBootstrap(
       provider: r.signedById ? "Signed" : "Draft",
     })),
     note: noteFromRecord(activeRecord),
+    prescriptions: arrayFromJson<PrescriptionItem>(activeRecord?.prescriptions),
+    labOrders: arrayFromJson<LabOrderItem>(activeRecord?.labOrders),
   };
 }

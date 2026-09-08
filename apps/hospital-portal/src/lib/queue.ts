@@ -27,7 +27,7 @@ export async function getTodaysQueue(tenantId: string, doctorUserId?: string): P
   const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
   const doctor = doctorUserId
-    ? await db.doctor.findUnique({ where: { userId: doctorUserId }, select: { id: true } })
+    ? await db.doctor.findFirst({ where: { userId: doctorUserId }, select: { id: true } })
     : null;
 
   const appts = await db.appointment.findMany({

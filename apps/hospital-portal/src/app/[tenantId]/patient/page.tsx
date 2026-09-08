@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getTenantBySlug } from "@/lib/tenant";
+import { requireRole } from "@/lib/auth";
+import { getPatientHome } from "@/lib/patient";
 
 export default async function PatientHome({
   params,
@@ -6,21 +10,28 @@ export default async function PatientHome({
   params: Promise<{ tenantId: string }>;
 }) {
   const { tenantId } = await params;
+  const tenant = await getTenantBySlug(tenantId);
+  if (!tenant) notFound();
+
+  const user = await requireRole(tenantId, "PATIENT");
+  const home = await getPatientHome(tenant.id, user.userId);
+
+  const balance = home ? (home.balanceDueCents / 100).toFixed(2) : "0.00";
 
   return (
     <div className="space-y-4 py-2">
       <section className="rounded-xl border border-border bg-primary p-4 text-primary-fg">
         <p className="text-xs uppercase tracking-wide text-primary-fg/70">Next appointment</p>
-        <p className="mt-1 text-lg font-semibold">Tue, 16 Sep · 10:30</p>
-        <p className="text-sm text-primary-fg/80">Dr. Reyes · General Medicine</p>
-        <div className="mt-3 flex gap-2">
-          <button className="rounded-md bg-primary-fg/15 px-3 py-1.5 text-xs font-medium">
-            Reschedule
-          </button>
-          <button className="rounded-md bg-primary-fg/15 px-3 py-1.5 text-xs font-medium">
-            Directions
-          </button>
-        </div>
+        {home?.nextAppointment ? (
+          <>
+            <p className="mt-1 text-lg font-semibold">{home.nextAppointment.when}</p>
+            <p className="text-sm text-primary-fg/80">
+              {home.nextAppointment.doctor} · {home.nextAppointment.specialty}
+            </p>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-primary-fg/80">Nothing scheduled.</p>
+        )}
       </section>
 
       <div className="grid grid-cols-2 gap-3">
@@ -36,20 +47,24 @@ export default async function PatientHome({
           className="rounded-xl border border-border bg-surface p-4 shadow-card"
         >
           <p className="text-sm font-semibold">Lab reports</p>
-          <p className="mt-1 text-xs text-muted-fg">2 new PDFs to download</p>
+          <p className="mt-1 text-xs text-muted-fg">
+            {home?.reportCount ?? 0} available
+          </p>
         </Link>
       </div>
 
       <section className="rounded-xl border border-border bg-surface p-4 shadow-card">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold">Outstanding balance</p>
-          <span className="text-lg font-semibold text-danger">$84.00</span>
+          <span className={home && home.balanceDueCents > 0 ? "text-lg font-semibold text-danger" : "text-lg font-semibold text-success"}>
+            ${balance}
+          </span>
         </div>
         <Link
           href={`/${tenantId}/patient/billing`}
           className="mt-3 block rounded-md bg-primary py-2 text-center text-sm font-semibold text-primary-fg"
         >
-          Pay now
+          {home && home.balanceDueCents > 0 ? "Pay now" : "View invoices"}
         </Link>
       </section>
     </div>

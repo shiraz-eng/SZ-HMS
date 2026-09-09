@@ -25,10 +25,9 @@ const nextConfig = {
       "../../packages/database/prisma/schema.prisma",
     ],
   },
-  // Lint + typecheck run separately (`pnpm lint`, `pnpm typecheck`); keep the
-  // deploy build resilient. Re-enable once the pipeline is green in CI.
+  // `pnpm typecheck` is clean and gates CI; `next build` type-checks too.
+  // ESLint still runs separately (`pnpm lint`) to keep deploys fast.
   eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
 };
 
 export default nextConfig;

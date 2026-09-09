@@ -106,6 +106,7 @@ export async function registerPatient(
     tempPassword = randomBytes(6).toString("base64url");
     const user = await db.user.create({
       data: {
+        tenantId,
         email: v.email.toLowerCase(),
         name: v.fullName,
         role: "PATIENT",
@@ -122,6 +123,7 @@ export async function registerPatient(
     try {
       const p = await db.patient.create({
         data: {
+          tenantId,
           mrn: mrn(),
           fullName: v.fullName,
           dateOfBirth: dob,
@@ -186,6 +188,7 @@ export async function scheduleAppointment(
 
   const appt = await db.appointment.create({
     data: {
+      tenantId,
       patientId: v.patientId,
       doctorId: v.doctorId,
       startsAt: starts,

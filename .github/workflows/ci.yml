@@ -25,9 +25,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      # Switch to --frozen-lockfile once pnpm-lock.yaml is committed
-      # (run `pnpm install` locally after Node is set up, then commit the lockfile).
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
         run: pnpm --filter @szhms/database run db:generate

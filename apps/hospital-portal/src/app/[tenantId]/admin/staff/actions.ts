@@ -46,8 +46,11 @@ export async function addStaff(_prev: AddStaffState, formData: FormData): Promis
 
   const tempPassword = randomBytes(6).toString("base64url");
 
+  // `tenantId` is also force-set by the forTenant() extension at runtime; it is
+  // passed explicitly here so the generated Prisma types are satisfied.
   const user = await db.user.create({
     data: {
+      tenantId,
       name: v.name,
       email: v.email.toLowerCase(),
       role: v.role,
@@ -59,13 +62,14 @@ export async function addStaff(_prev: AddStaffState, formData: FormData): Promis
   if (v.role === "DOCTOR") {
     await db.doctor.create({
       data: {
+        tenantId,
         userId: user.id,
         specialty: v.specialty || "General Medicine",
         licenseNo: v.licenseNo || `LIC-${randomBytes(3).toString("hex").toUpperCase()}`,
       },
     });
   } else if (v.role === "RECEPTIONIST") {
-    await db.receptionist.create({ data: { userId: user.id } });
+    await db.receptionist.create({ data: { tenantId, userId: user.id } });
   }
 
   await recordAudit({

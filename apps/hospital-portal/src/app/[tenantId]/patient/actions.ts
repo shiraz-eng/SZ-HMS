@@ -40,7 +40,7 @@ export async function bookAppointment(_prev: BookState, formData: FormData): Pro
     return { error: parsed.error.issues[0]?.message ?? "Please check the form." };
   }
   const v = parsed.data;
-  const { db, patientId } = await ctx(v.tenantSlug);
+  const { db, patientId, tenantId } = await ctx(v.tenantSlug);
 
   const starts = new Date(`${v.date}T${v.time}:00`);
   if (Number.isNaN(starts.getTime()) || starts.getTime() < Date.now()) {
@@ -50,6 +50,7 @@ export async function bookAppointment(_prev: BookState, formData: FormData): Pro
 
   await db.appointment.create({
     data: {
+      tenantId,
       patientId,
       doctorId: v.doctorId,
       startsAt: starts,

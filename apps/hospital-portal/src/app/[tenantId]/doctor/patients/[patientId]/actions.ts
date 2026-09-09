@@ -91,6 +91,7 @@ async function persist(
     } else {
       await tx.medicalRecord.create({
         data: {
+          tenantId: tenant.id,
           appointmentId: appointment.id,
           patientId: appointment.patientId,
           vitals: [],
@@ -113,6 +114,7 @@ async function persist(
       if (!existingBill) {
         await tx.billing.create({
           data: {
+            tenantId: tenant.id,
             appointmentId: appointment.id,
             patientId: appointment.patientId,
             invoiceNo: `INV-${Date.now().toString(36).toUpperCase()}`,

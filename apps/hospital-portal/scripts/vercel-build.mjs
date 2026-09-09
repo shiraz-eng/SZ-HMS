@@ -1,9 +1,12 @@
 // Vercel build for the hospital portal.
-//  1. push the Prisma schema to the database + generate the client
-//  2. seed demo data (non-fatal)
-//  3. next build
-//  4. copy the rhel query engine into .next/server so Prisma finds it at runtime
+//  1. generate the Prisma client
+//  2. next build
+//  3. copy the rhel query engine into .next/server so Prisma finds it at runtime
 //     (the pnpm-hoisted engine is otherwise missed by the function bundler)
+//
+// The schema is applied to the database out of band:
+//   pnpm --filter @szhms/database db:push     (or db:deploy with migrations)
+// Set SZHMS_DB_PUSH=1 to also push + seed during the build (first deploy only).
 
 import { execSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
@@ -34,10 +37,7 @@ function findFile(dir, name, depth = 0) {
   } catch {
     return null;
   }
-  for (const e of entries) {
-    const p = join(dir, e.name);
-    if (e.isFile() && e.name === name) return p;
-  }
+  for (const e of entries) if (e.isFile() && e.name === name) return join(dir, e.name);
   for (const e of entries) {
     if (e.isDirectory() && e.name !== ".bin") {
       const found = findFile(join(dir, e.name), name, depth + 1);
@@ -47,22 +47,34 @@ function findFile(dir, name, depth = 0) {
   return null;
 }
 
-console.log("── db push ──");
-run("pnpm --filter @szhms/database run db:push");
-
-console.log("── seed ──");
-run("pnpm --filter @szhms/database run db:seed", { allowFail: true });
+if (process.env.SZHMS_DB_PUSH === "1") {
+  console.log("── db push (SZHMS_DB_PUSH=1) ──");
+  run("pnpm --filter @szhms/database run db:push");
+  console.log("── seed ──");
+  run("pnpm --filter @szhms/database run db:seed", { allowFail: true });
+} else {
+  console.log("── prisma generate ──");
+  run("pnpm --filter @szhms/database run db:generate");
+}
 
 console.log("── next build ──");
 run("pnpm run build");
 
 console.log("── copy prisma engine into .next/server ──");
 let src = null;
-const pnpmDir = join(ROOT, "node_modules", ".pnpm");
 try {
-  for (const d of readdirSync(pnpmDir)) {
+  for (const d of readdirSync(join(ROOT, "node_modules", ".pnpm"))) {
     if (d.startsWith("@prisma+client@")) {
-      const cand = join(pnpmDir, d, "node_modules", ".prisma", "client", ENGINE);
+      const cand = join(
+        ROOT,
+        "node_modules",
+        ".pnpm",
+        d,
+        "node_modules",
+        ".prisma",
+        "client",
+        ENGINE,
+      );
       if (existsSync(cand)) {
         src = cand;
         break;
@@ -75,7 +87,7 @@ try {
 if (!src) src = findFile(join(ROOT, "node_modules"), ENGINE);
 
 if (!src) {
-  console.error(`ERROR: ${ENGINE} was not generated — check the db push / prisma generate step`);
+  console.error(`ERROR: ${ENGINE} was not generated — check the prisma generate step`);
   process.exit(1);
 }
 

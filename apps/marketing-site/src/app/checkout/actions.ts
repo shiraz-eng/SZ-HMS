@@ -39,6 +39,14 @@ export async function startCheckout(
   const plan = getPlan(data.planId);
   if (!plan || plan.contactSales) return { error: "Pick a self-serve plan." };
 
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey || stripeKey === "sk_test_xxx" || !stripeKey.startsWith("sk_")) {
+    return {
+      error:
+        "Payments aren't configured on this environment. Set STRIPE_SECRET_KEY and the STRIPE_PRICE_* vars to enable checkout.",
+    };
+  }
+
   const slug = normalizeSlug(data.subdomain);
   if (!(await isSlugAvailable(slug))) {
     return { error: `The subdomain "${slug}" is taken or invalid.` };
